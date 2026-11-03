@@ -130,6 +130,15 @@ pub fn get_translation(key: &str, locale: Locale) -> String {
     )
 }
 
+/// Whether the Bedrock client knows this key. Bedrock keys are the ones stored without a namespace.
+#[must_use]
+pub fn is_bedrock_key(key: &str) -> bool {
+    TRANSLATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)[Locale::EnUs as usize]
+        .contains_key(&key.to_lowercase())
+}
+
 /// What a `%` in a translation string introduces.
 enum Placeholder {
     /// `%%`, which stands for a single literal `%`.
@@ -729,7 +738,7 @@ impl FromStr for Locale {
 mod tests {
     use super::{
         Locale, TRANSLATIONS, add_translation, add_translation_file, get_translation,
-        get_translation_text, reorder_substitutions,
+        get_translation_text, is_bedrock_key, reorder_substitutions,
     };
     use crate::text::{TextComponent, TextComponentBase, TextContent, style::Style};
 
@@ -796,6 +805,26 @@ mod tests {
             with: vec![arg("7")],
         });
         assert_eq!(message.0.to_bedrock_legacy(Locale::EnUs), "7");
+    }
+
+    #[test]
+    fn key_unknown_to_bedrock_becomes_java_text() {
+        assert!(!is_bedrock_key("build.spawn_protection"));
+        assert!(is_bedrock_key("commands.scoreboard.players.get.success"));
+
+        let message = TextComponent::from_content(TextContent::Translate {
+            translate: "build.spawn_protection".into(),
+            bedrock_translate: Some("build.spawn_protection".into()),
+            with: vec![arg("7")],
+        });
+        let java = get_translation_text(
+            "minecraft:build.spawn_protection",
+            Locale::EnUs,
+            vec![arg("7")],
+        );
+        assert_ne!(java, "minecraft:build.spawn_protection");
+        assert_eq!(message.0.to_bedrock_legacy(Locale::EnUs), java);
+        assert_eq!(message.0.to_bedrock_string(), java);
     }
 
     #[test]

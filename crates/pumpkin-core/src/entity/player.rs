@@ -5744,7 +5744,10 @@ impl Player {
                 translate,
                 bedrock_translate,
                 with,
-            } => {
+            } if pumpkin_util::translation::is_bedrock_key(
+                bedrock_translate.as_deref().unwrap_or(translate.as_ref()),
+            ) =>
+            {
                 let key = bedrock_translate.as_deref().unwrap_or(translate.as_ref());
                 let parameters = with
                     .iter()

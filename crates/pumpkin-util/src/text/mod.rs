@@ -1,6 +1,7 @@
 use crate::text::color::{ARGBColor, hsv_to_rgb};
 use crate::translation::{
-    Locale, get_translation, get_translation_text, reorder_substitutions, translation_to_pretty,
+    Locale, get_translation, get_translation_text, is_bedrock_key, reorder_substitutions,
+    translation_to_pretty,
 };
 use crate::version::JavaMinecraftVersion;
 use click::ClickEvent;
@@ -1068,10 +1069,19 @@ impl TextComponentBase {
             TextContent::Translate {
                 translate,
                 bedrock_translate,
-                with: _,
+                with,
             } => {
                 let key = bedrock_translate.as_deref().unwrap_or(translate.as_ref());
-                let _ = write!(text, "%{key}");
+                if is_bedrock_key(key) {
+                    let _ = write!(text, "%{key}");
+                } else {
+                    // The client would print the key itself, so it gets the text instead.
+                    text.push_str(&get_translation_text(
+                        format!("minecraft:{translate}"),
+                        Locale::EnUs,
+                        with.clone(),
+                    ));
+                }
             }
             TextContent::EntityNames { selector, .. } => text.push_str(selector),
             TextContent::Keybind { keybind } => text.push_str(keybind),
@@ -1136,7 +1146,13 @@ impl TextComponentBase {
                 with,
             } => {
                 let key = bedrock_translate.as_ref().unwrap_or(translate);
-                text.push_str(&get_translation_text(key.to_string(), locale, with.clone()));
+                // Without a Bedrock text for the key the Java one is better than the key itself.
+                let key = if is_bedrock_key(key) {
+                    key.to_string()
+                } else {
+                    format!("minecraft:{translate}")
+                };
+                text.push_str(&get_translation_text(key, locale, with.clone()));
             }
             TextContent::EntityNames { selector, .. } => text.push_str(selector),
             TextContent::Keybind { keybind } => text.push_str(keybind),
