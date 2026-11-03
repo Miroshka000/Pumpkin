@@ -157,9 +157,10 @@ struct BuilderContext<'a> {
 
 pub fn send_bedrock_commands_packet(
     player: &Arc<Player>,
-    _server: &Server,
+    server: &Arc<Server>,
     dispatcher: &CommandDispatcher,
 ) {
+    let source = &super::CommandSender::Player(player.clone()).into_source(server);
     let mut enum_values: Vec<String> = Vec::new();
     let mut enums: Vec<EnumData> = Vec::new();
     let mut commands: Vec<CommandData> = Vec::new();
@@ -201,6 +202,11 @@ pub fn send_bedrock_commands_packet(
         };
 
         if dispatcher.is_disabled(&name.to_ascii_lowercase()) {
+            continue;
+        }
+
+        // A command the player cannot run stays out of the hints, like on Java.
+        if !node.requirements().evaluate(source) {
             continue;
         }
 
