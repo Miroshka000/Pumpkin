@@ -49,6 +49,10 @@ impl BedrockClient {
                             creative_item_id,
                             repetitions,
                         } => {
+                            if player.gamemode.load() != GameMode::Creative {
+                                result = 1;
+                                break;
+                            }
                             let index = (creative_item_id.0.saturating_sub(1)) as usize;
                             if index < pumpkin_data::bedrock_creative::CREATIVE_ENTRIES.len() {
                                 let entry = pumpkin_data::bedrock_creative::CREATIVE_ENTRIES[index];

@@ -45,6 +45,54 @@ impl BedrockClient {
         !event.cancelled
     }
 
+    /// Whether a transaction could really happen. Outside creative mode every slot must hold
+    /// what the client says, and no item may come out in larger numbers than went in.
+    /// The items in the packet are the client's word, so without this it could create any of them.
+    fn is_possible_transaction(player: &Player, packet: &SInventoryTransaction) -> bool {
+        use pumpkin_protocol::bedrock::server::inventory_transaction::InventoryActionSource;
+
+        if player.gamemode.load() == GameMode::Creative {
+            return true;
+        }
+        let screen_handler = player
+            .player_screen_handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut balance: std::collections::HashMap<u16, i32> = std::collections::HashMap::new();
+        for action in &packet.actions {
+            let old_stack = descriptor_to_stack(&action.old_item);
+            let new_stack = descriptor_to_stack(&action.new_item);
+            if InventoryActionSource::from(action.source_type) == InventoryActionSource::World {
+                if old_stack.is_empty() && !new_stack.is_empty() {
+                    *balance.entry(new_stack.item.id).or_default() +=
+                        i32::from(new_stack.item_count);
+                }
+                continue;
+            }
+            let Some(screen_slot) = action.window_id.and_then(|window_id| {
+                map_bedrock_slot_to_screen_handler(window_id, action.inventory_slot)
+            }) else {
+                continue;
+            };
+            let held = screen_handler.get_slot(screen_slot).get_cloned_stack();
+            let matches_server = if held.is_empty() || old_stack.is_empty() {
+                held.is_empty() && old_stack.is_empty()
+            } else {
+                held.item.id == old_stack.item.id && held.item_count == old_stack.item_count
+            };
+            if !matches_server {
+                return false;
+            }
+            if !old_stack.is_empty() {
+                *balance.entry(old_stack.item.id).or_default() -= i32::from(old_stack.item_count);
+            }
+            if !new_stack.is_empty() {
+                *balance.entry(new_stack.item.id).or_default() += i32::from(new_stack.item_count);
+            }
+        }
+        balance.values().all(|count| *count <= 0)
+    }
+
     /// Checks the drops a legacy transaction is about to make. They go together or not at all.
     fn allow_legacy_drops(&self, player: &Arc<Player>, packet: &SInventoryTransaction) -> bool {
         let stacks: Vec<ItemStack> = {
@@ -139,6 +187,11 @@ impl BedrockClient {
         let mut inventory_updated = false;
         let mut updates = Vec::new();
         let result = 0u8;
+
+        if !Self::is_possible_transaction(player, &packet) {
+            self.send_inventory_content(player);
+            return;
+        }
 
         if !self.allow_world_drops(player, &packet) {
             return;
