@@ -146,6 +146,10 @@ pub fn send_c_commands_packet(
     player.try_send_client_packet(&packet);
 }
 
+/// The Bedrock client rejects the packet and leaves the server when a list here is longer than this.
+/// Whatever does not fit stays usable from Java and the console.
+const BEDROCK_COMMAND_LIST_LIMIT: usize = 250;
+
 struct BuilderContext<'a> {
     enum_values: &'a mut Vec<String>,
     enums: &'a mut Vec<EnumData>,
@@ -159,6 +163,9 @@ pub fn send_bedrock_commands_packet(
     let mut enum_values: Vec<String> = Vec::new();
     let mut enums: Vec<EnumData> = Vec::new();
     let mut commands: Vec<CommandData> = Vec::new();
+    // Plugins register `/name`, typed as `//name`, with an alias `name`. Players use the first,
+    // so the alias is the first to go when the list is too long.
+    let mut plain_twins = std::collections::HashSet::new();
 
     let tree_nodes: Vec<&AttachedNode> = dispatcher.tree.iter().collect();
 
@@ -201,13 +208,31 @@ pub fn send_bedrock_commands_packet(
             continue;
         }
 
+        let target = node
+            .redirect()
+            .and_then(|redirection| dispatcher.tree.resolve(redirection))
+            .and_then(|id| tree_nodes.get(id.0.get() - 1))
+            .and_then(|target| match target {
+                AttachedNode::Literal(lit) => Some(lit.meta.literal.as_ref()),
+                AttachedNode::Command(cmd) => Some(cmd.meta.literal.as_ref()),
+                _ => None,
+            });
+        if let Some(target) = target {
+            if target.strip_prefix('/') == Some(name.as_str()) {
+                plain_twins.insert(name.clone());
+            } else if name.strip_prefix('/') == Some(target) {
+                plain_twins.insert(target.to_owned());
+            }
+        }
+
         let mut ctx = BuilderContext {
             enum_values: &mut enum_values,
             enums: &mut enums,
         };
 
-        let overloads =
+        let mut overloads =
             build_overloads_from_attached_nodes(&tree_nodes, &child_ids, is_executable, &mut ctx);
+        overloads.truncate(BEDROCK_COMMAND_LIST_LIMIT);
 
         commands.push(CommandData {
             name,
@@ -218,6 +243,11 @@ pub fn send_bedrock_commands_packet(
             command_data_chained_subcommand_indexes: Vec::new(),
             overloads,
         });
+    }
+
+    if commands.len() > BEDROCK_COMMAND_LIST_LIMIT {
+        commands.retain(|command| !plain_twins.contains(&command.name));
+        commands.truncate(BEDROCK_COMMAND_LIST_LIMIT);
     }
 
     let packet = CAvailableCommands {
