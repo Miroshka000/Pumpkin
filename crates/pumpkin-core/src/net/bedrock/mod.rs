@@ -59,6 +59,7 @@ use tokio::{
 
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
+pub mod data_driven_blocks;
 pub mod level_chunk;
 pub mod login;
 use self::level_chunk::CLevelChunk;

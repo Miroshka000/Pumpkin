@@ -2942,7 +2942,7 @@ impl World {
             server_authoritative_block_breaking: true,
             current_level_time: self.get_world_age() as _,
             enchantment_seed: VarInt(0),
-            block_properties: Vec::new(),
+            block_properties: crate::net::bedrock::data_driven_blocks::block_properties(),
             // TODO Make this unique
             multiplayer_correlation_id: Uuid::default().to_string(),
             enable_itemstack_net_manager: true,

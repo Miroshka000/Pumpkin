@@ -23,6 +23,9 @@ This directory contains a number of different data files used to help support co
     - downloaded from [Kaooot/bedrock-network-data](https://github.com/Kaooot/bedrock-network-data/blob/master/release/1.26.40/biome_definitions.nbt)
     - Contains the gzip-compressed vanilla biome registry extracted from Bedrock Dedicated Server 1.26.40.
     - Validated and converted by `pumpkin-codegen` into the static `BiomeDefinitionList` wire payload used during Bedrock world initialization.
+- `data_driven_blocks.nbt`
+    - downloaded from [CloudburstMC/Data](https://github.com/CloudburstMC/Data/blob/0021592b/data_driven_blocks.nbt)
+    - Defines the vanilla blocks a client only registers from the `block_properties` of `StartGame`.
 - `entity_properties.json`
     - generated from the `client_sync` properties in [Mojang/bedrock-samples v1.26.60.5](https://github.com/Mojang/bedrock-samples/tree/v1.26.60.5/behavior_pack/entities)
     - Defines the properties the vanilla resource pack reads with `query.property`, sent with `SyncActorProperty` after `StartGame`. A default written in Molang becomes `false`, the value it starts as.
