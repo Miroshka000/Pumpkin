@@ -23,6 +23,9 @@ This directory contains a number of different data files used to help support co
     - downloaded from [Kaooot/bedrock-network-data](https://github.com/Kaooot/bedrock-network-data/blob/master/release/1.26.40/biome_definitions.nbt)
     - Contains the gzip-compressed vanilla biome registry extracted from Bedrock Dedicated Server 1.26.40.
     - Validated and converted by `pumpkin-codegen` into the static `BiomeDefinitionList` wire payload used during Bedrock world initialization.
+- `entity_properties.json`
+    - generated from the `client_sync` properties in [Mojang/bedrock-samples v1.26.60.5](https://github.com/Mojang/bedrock-samples/tree/v1.26.60.5/behavior_pack/entities)
+    - Defines the properties the vanilla resource pack reads with `query.property`, sent with `SyncActorProperty` after `StartGame`. A default written in Molang becomes `false`, the value it starts as.
 - `player_geometry.json`
     - adapted from [GeyserMC/Geyser](https://github.com/GeyserMC/Geyser/blob/master/core/src/main/resources/bedrock/geometries/geo.json) (MIT License)
     - Provides valid standard wide and slim Bedrock player geometry for Java Edition player skins.

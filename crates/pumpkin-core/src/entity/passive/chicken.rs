@@ -17,6 +17,7 @@ use pumpkin_util::math::position::BlockPos;
 use rand::RngExt;
 
 use crate::entity::ai::pathfinder::node::PathType;
+use crate::entity::bedrock_properties;
 use crate::entity::custom_sound::CustomSound;
 use crate::entity::{
     Entity, EntityBase,
@@ -352,6 +353,21 @@ impl Mob for ChickenEntity {
         if let Some(v) = ChickenSoundVariant::from_name(name) {
             self.set_sound_variant(v);
         }
+    }
+
+    fn mob_bedrock_properties(&self) -> Vec<(&'static str, &'static str)> {
+        let variant =
+            ChickenVariant::from_id(self.variant.load(Ordering::Relaxed)).unwrap_or_default();
+        let sound_variant =
+            ChickenSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+                .unwrap_or_default();
+        vec![
+            (bedrock_properties::CLIMATE_VARIANT, variant.to_name()),
+            (
+                bedrock_properties::SOUND_VARIANT,
+                bedrock_properties::sound_variant_value(sound_variant.to_name()),
+            ),
+        ]
     }
 
     fn mob_init_data_tracker(&self) {

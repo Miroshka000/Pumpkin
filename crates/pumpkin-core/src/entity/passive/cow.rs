@@ -14,6 +14,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::position::BlockPos;
 use rand::RngExt;
 
+use crate::entity::bedrock_properties;
 use crate::entity::{
     Entity, EntityBase,
     ageable::AgeableMob,
@@ -191,6 +192,19 @@ impl Mob for CowEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    fn mob_bedrock_properties(&self) -> Vec<(&'static str, &'static str)> {
+        let variant = CowVariant::from_id(self.variant.load(Ordering::Relaxed)).unwrap_or_default();
+        let sound_variant = CowSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        vec![
+            (bedrock_properties::CLIMATE_VARIANT, variant.to_name()),
+            (
+                bedrock_properties::SOUND_VARIANT,
+                bedrock_properties::sound_variant_value(sound_variant.to_name()),
+            ),
+        ]
     }
 
     fn mob_init_data_tracker(&self) {

@@ -16,6 +16,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::position::BlockPos;
 use rand::RngExt;
 
+use crate::entity::bedrock_properties;
 use crate::entity::custom_sound::CustomSound;
 use crate::entity::{
     Entity, EntityBase,
@@ -349,6 +350,15 @@ impl Mob for WolfEntity {
         }) {
             self.set_sound_variant_id(id as u8);
         }
+    }
+
+    fn mob_bedrock_properties(&self) -> Vec<(&'static str, &'static str)> {
+        let sound_variant = WolfSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        vec![(
+            bedrock_properties::SOUND_VARIANT,
+            bedrock_properties::sound_variant_value(sound_variant.to_name()),
+        )]
     }
 
     fn mob_init_data_tracker(&self) {

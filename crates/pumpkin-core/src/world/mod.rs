@@ -2969,6 +2969,12 @@ impl World {
             client.send_game_packet(data).await;
         }
 
+        for packet in crate::entity::bedrock_properties::definition_packets() {
+            if let Ok(data) = client.serialize_packet(packet) {
+                client.send_game_packet(data).await;
+            }
+        }
+
         if let Ok(data) = client.serialize_packet(&CBiomeDefinitionList) {
             client.send_game_packet(data).await;
         }

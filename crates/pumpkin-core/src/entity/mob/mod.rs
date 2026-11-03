@@ -1477,6 +1477,12 @@ pub trait Mob: EntityBase + Send + Sync {
         self.mob_metadata().map(|m| m.to_bedrock_actor_data())
     }
 
+    /// Client synced Bedrock properties this mob sets itself, as (property name, enum value).
+    /// The rest keep the default of their definition in [`crate::entity::bedrock_properties`].
+    fn mob_bedrock_properties(&self) -> Vec<(&'static str, &'static str)> {
+        Vec::new()
+    }
+
     fn get_job_site(&self) -> Option<BlockPos> {
         None
     }

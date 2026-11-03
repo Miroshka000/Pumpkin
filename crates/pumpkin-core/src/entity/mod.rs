@@ -77,6 +77,7 @@ pub mod ageable;
 pub mod ai;
 pub mod area_effect_cloud;
 pub mod attributes;
+pub mod bedrock_properties;
 pub mod boss;
 pub mod breath;
 pub mod bucketable;
@@ -744,6 +745,10 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         {
             metadata.0.extend(mob_metadata.0);
         }
+        let chosen_properties = self
+            .get_mob()
+            .map(mob::Mob::mob_bedrock_properties)
+            .unwrap_or_default();
         let packet = CAddActor {
             target_actor_id: VarLong(runtime_id as i64),
             target_runtime_id: VarULong(runtime_id),
@@ -755,12 +760,7 @@ pub trait EntityBase: Send + Sync + std::any::Any {
             y_body_rotation: entity.body_yaw.load(),
             attributes_list: Vec::new(),
             actor_data: metadata,
-            // TODO: Bedrock `climate_variant` property for pig/cow/chicken (`TemperatureVariantAnimal`)
-            // empty -> client picks its own variant.
-            synced_properties: PropertySyncData {
-                int_entries_list: std::collections::HashMap::new(),
-                float_entries_list: std::collections::HashMap::new(),
-            },
+            synced_properties: bedrock_properties::spawn_values(identifier, &chosen_properties),
             actor_links: entity.bedrock_actor_links(),
             passenger_of_block: None,
         };

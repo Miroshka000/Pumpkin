@@ -1,0 +1,47 @@
+{
+  "minecraft:armadillo": [
+    {"name": "minecraft:armadillo_state", "type": "enum", "values": ["unrolled", "rolled_up", "rolled_up_peeking", "rolled_up_relaxing", "rolled_up_unrolling"], "default": "unrolled"}
+  ],
+  "minecraft:bee": [
+    {"name": "minecraft:has_nectar", "type": "bool", "default": false}
+  ],
+  "minecraft:cat": [
+    {"name": "minecraft:sound_variant", "type": "enum", "values": ["default", "royal"], "default": "default"}
+  ],
+  "minecraft:chicken": [
+    {"name": "minecraft:climate_variant", "type": "enum", "values": ["temperate", "warm", "cold"], "default": "temperate"},
+    {"name": "minecraft:sound_variant", "type": "enum", "values": ["default", "picky"], "default": "default"}
+  ],
+  "minecraft:copper_golem": [
+    {"name": "minecraft:chest_interaction", "type": "enum", "values": ["none", "take", "take_fail", "put", "put_fail"], "default": "none"},
+    {"name": "minecraft:has_flower", "type": "bool", "default": false},
+    {"name": "minecraft:oxidation_level", "type": "enum", "values": ["unoxidized", "exposed", "weathered", "oxidized"], "default": "unoxidized"}
+  ],
+  "minecraft:cow": [
+    {"name": "minecraft:climate_variant", "type": "enum", "values": ["temperate", "warm", "cold"], "default": "temperate"},
+    {"name": "minecraft:sound_variant", "type": "enum", "values": ["default", "moody"], "default": "default"}
+  ],
+  "minecraft:creaking": [
+    {"name": "minecraft:creaking_state", "type": "enum", "values": ["neutral", "hostile_observed", "hostile_unobserved", "twitching", "crumbling"], "default": "neutral"},
+    {"name": "minecraft:creaking_swaying_ticks", "type": "int", "range": [0, 6], "default": 0}
+  ],
+  "minecraft:egg": [
+    {"name": "minecraft:climate_variant", "type": "enum", "values": ["temperate", "warm", "cold"], "default": "temperate"}
+  ],
+  "minecraft:happy_ghast": [
+    {"name": "minecraft:can_move", "type": "bool", "default": true}
+  ],
+  "minecraft:pig": [
+    {"name": "minecraft:climate_variant", "type": "enum", "values": ["temperate", "warm", "cold"], "default": "temperate"},
+    {"name": "minecraft:sound_variant", "type": "enum", "values": ["default", "big", "mini"], "default": "default"}
+  ],
+  "minecraft:sulfur_cube": [
+    {"name": "minecraft:sulfur_cube_archetype", "type": "enum", "values": ["none", "bouncy", "regular", "slow_bouncy", "slow_flat", "fast_flat", "light", "fast_sliding", "slow_sliding", "sticky", "high_resistance", "explosive", "hot"], "default": "none"}
+  ],
+  "minecraft:wolf": [
+    {"name": "minecraft:sound_variant", "type": "enum", "values": ["default", "big", "cute", "grumpy", "mad", "puglin", "sad"], "default": "default"}
+  ],
+  "minecraft:zombie_nautilus": [
+    {"name": "minecraft:variant", "type": "enum", "values": ["default", "coral"], "default": "default"}
+  ]
+}
