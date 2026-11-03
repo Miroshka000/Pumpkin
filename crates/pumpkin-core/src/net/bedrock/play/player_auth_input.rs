@@ -3,6 +3,53 @@ use super::*;
 use pumpkin_data::entity::EntityPose;
 
 impl BedrockClient {
+    /// Asks plugins about a move like the Java handlers do. Returns where the player ends up
+    /// and whether that differs from where they were.
+    fn fire_move_event(
+        &self,
+        player: &Arc<Player>,
+        server: &Arc<Server>,
+        from: pumpkin_util::math::vector3::Vector3<f64>,
+        to: pumpkin_util::math::vector3::Vector3<f64>,
+        look: (f32, f32),
+    ) -> (pumpkin_util::math::vector3::Vector3<f64>, bool) {
+        if to == from {
+            return (from, false);
+        }
+        let mut event = PlayerMoveEvent {
+            player: player.clone(),
+            from,
+            to,
+            cancelled: false,
+        };
+        server.plugin_manager.fire_blocking(server, &mut event);
+        if event.cancelled {
+            let (yaw, pitch) = look;
+            let eye_height = player.get_entity().entity_type.eye_height;
+            self.try_enqueue_client_packet(&pumpkin_protocol::bedrock::client::CMovePlayer::new(
+                pumpkin_protocol::codec::var_ulong::VarULong(player.entity_id() as u64),
+                pumpkin_util::math::vector3::Vector3::new(
+                    from.x as f32,
+                    from.y as f32 + eye_height,
+                    from.z as f32,
+                ),
+                pitch,
+                yaw,
+                yaw,
+                pumpkin_protocol::bedrock::client::CMovePlayer::MODE_TELEPORT,
+                false,
+                pumpkin_protocol::codec::var_ulong::VarULong(0),
+                0,
+                0,
+                pumpkin_protocol::codec::var_ulong::VarULong(
+                    player.tick_counter.load(Ordering::Relaxed).max(0) as u64,
+                ),
+            ));
+            return (from, false);
+        }
+        (event.to, event.to != from)
+    }
+
     #[expect(clippy::too_many_lines)]
     pub fn handle_player_auth_input(
         &self,
@@ -58,7 +105,8 @@ impl BedrockClient {
         let old_pitch = entity.pitch.load();
         let old_yaw = entity.yaw.load();
 
-        let pos_changed = new_pos != old_pos;
+        let (new_pos, pos_changed) =
+            self.fire_move_event(player, server, old_pos, new_pos, (new_yaw, new_pitch));
         let rot_changed = new_pitch != old_pitch || new_yaw != old_yaw;
 
         if pos_changed || rot_changed {

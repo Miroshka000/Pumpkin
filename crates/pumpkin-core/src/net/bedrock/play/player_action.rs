@@ -2,6 +2,74 @@
 use super::*;
 
 impl BedrockClient {
+    /// Puts back a block the client already removed or replaced in its own prediction.
+    pub(super) fn sync_block(&self, world: &crate::world::World, position: BlockPos) {
+        let state = world.get_block_state(&position);
+        let runtime_id = pumpkin_data::BlockState::to_be_network_id(state.id);
+        self.try_enqueue_client_packet(&CUpdateBlock::new(position, runtime_id));
+    }
+
+    /// Fires the events the Java handler fires for a click on a block. Returns whether the click goes on.
+    ///
+    /// One press can bring several actions for one block, so a refusal holds until the next press.
+    /// Otherwise a plugin that cancels the click would see it twice and the block would still break.
+    fn allow_block_click(
+        &self,
+        player: &Arc<Player>,
+        server: &Arc<Server>,
+        world: &crate::world::World,
+        action: PlayerAction,
+        location: BlockPos,
+    ) -> bool {
+        if matches!(action, PlayerAction::StartDestroyBlock) {
+            self.denied_block.store(None);
+        }
+        if self.denied_block.load() == Some(location) {
+            self.sync_block(world, location);
+            return false;
+        }
+        let already_mining = player.mining.load(Ordering::Relaxed)
+            && *player
+                .mining_pos
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                == location;
+        let (block, state) = world.get_block_and_state(&location);
+        if already_mining || state.is_air() {
+            return true;
+        }
+
+        let mut interact_event = PlayerInteractEvent::new(
+            player,
+            InteractAction::LeftClickBlock,
+            block,
+            Some(location),
+        );
+        server
+            .plugin_manager
+            .fire_blocking(server, &mut interact_event);
+        let mut allowed = !interact_event.cancelled;
+        if allowed {
+            let mut damage_event =
+                crate::plugin::api::events::block::block_damage::BlockDamageEvent::new(
+                    player.clone(),
+                    block,
+                    location,
+                    false,
+                );
+            server
+                .plugin_manager
+                .fire_blocking(server, &mut damage_event);
+            allowed = !damage_event.cancelled;
+        }
+        if !allowed {
+            player.stop_mining();
+            self.denied_block.store(Some(location));
+            self.sync_block(world, location);
+        }
+        allowed
+    }
+
     #[expect(clippy::match_same_arms)]
     #[expect(clippy::too_many_lines)]
     pub fn handle_player_action(
@@ -42,6 +110,10 @@ impl BedrockClient {
                     player.stop_mining();
                 }
 
+                if !self.allow_block_click(player, server, &world, packet.action, location) {
+                    return;
+                }
+
                 if player.gamemode.load() == GameMode::Creative {
                     let new_state = world.break_block(
                         &location,
@@ -52,6 +124,8 @@ impl BedrockClient {
                         server
                             .block_registry
                             .broken(&world, block, player, &location, server, state);
+                    } else {
+                        self.sync_block(&world, location);
                     }
                 } else if !state.is_air() {
                     let starts_breaking = !player.mining.load(Ordering::Relaxed)
@@ -100,6 +174,8 @@ impl BedrockClient {
                                 block.id.as_u16() as i32,
                                 1,
                             );
+                        } else {
+                            self.sync_block(&world, location);
                         }
                     } else {
                         let mut mining_pos = player
@@ -197,6 +273,8 @@ impl BedrockClient {
                                 block.id.as_u16() as i32,
                                 1,
                             );
+                        } else {
+                            self.sync_block(&world, location);
                         }
                     } else {
                         let runtime_id = pumpkin_data::BlockState::to_be_network_id(state.id);

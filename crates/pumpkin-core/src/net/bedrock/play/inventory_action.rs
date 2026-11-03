@@ -28,6 +28,40 @@ impl BedrockClient {
         player.send_health();
     }
 
+    fn send_inventory_content(&self, player: &Player) {
+        let slots = player
+            .inventory()
+            .main_inventory
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .map(NetworkItemStackDescriptor::from)
+            .collect();
+        self.try_enqueue_client_packet(&CInventoryContent {
+            container_id: VarUInt(0),
+            slots,
+            full_container_name: FullContainerName {
+                container_name: ContainerName::Inventory,
+                dynamic_id: None,
+            },
+            storage_item: NetworkItemStackDescriptor::default(),
+        });
+    }
+
+    /// Puts back what the client predicted for a click on a block that did not go through:
+    /// the block it clicked, the block it placed next to it and the item it spent.
+    fn undo_block_use(
+        &self,
+        player: &Player,
+        world: &crate::world::World,
+        position: BlockPos,
+        face: BlockDirection,
+    ) {
+        self.sync_block(world, position);
+        self.sync_block(world, position.offset(face.to_offset()));
+        self.send_inventory_content(player);
+    }
+
     #[allow(clippy::too_many_lines, clippy::collapsible_if, clippy::unreachable)]
     pub fn handle_inventory_action(&self, player: &Arc<Player>, packet: SInventoryTransaction) {
         tracing::debug!("handle_inventory_action: packet={:?}", packet);
@@ -143,23 +177,7 @@ impl BedrockClient {
         }
 
         if inventory_updated {
-            let slots = player
-                .inventory()
-                .main_inventory
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .iter()
-                .map(NetworkItemStackDescriptor::from)
-                .collect();
-            self.try_enqueue_client_packet(&CInventoryContent {
-                container_id: VarUInt(0),
-                slots,
-                full_container_name: FullContainerName {
-                    container_name: ContainerName::Inventory,
-                    dynamic_id: None,
-                },
-                storage_item: NetworkItemStackDescriptor::default(),
-            });
+            self.send_inventory_content(player);
         }
 
         match packet.transaction_data {
@@ -183,6 +201,20 @@ impl BedrockClient {
                 let Some(server) = world.server.upgrade() else {
                     return;
                 };
+
+                if data.action_type.0 == 0 {
+                    let mut event = PlayerInteractEvent::new(
+                        player,
+                        InteractAction::RightClickBlock,
+                        block,
+                        Some(data.block_position),
+                    );
+                    server.plugin_manager.fire_blocking(&server, &mut event);
+                    if event.cancelled {
+                        self.undo_block_use(player, &world, data.block_position, face);
+                        return;
+                    }
+                }
 
                 if player.gamemode.load() == GameMode::Spectator {
                     if let Some(factory) = server.block_registry.get_screen_handler_factory(
@@ -277,15 +309,17 @@ impl BedrockClient {
                                         sequence: VarInt(0),
                                     };
 
-                                if let Ok(Some(_)) = server.block_registry.place_block(
+                                let placement = server.block_registry.place_block(
                                     player,
                                     placed_block,
                                     &server,
                                     &dummy_use_item_on,
                                     data.block_position,
                                     face,
-                                ) && player.gamemode.load() != GameMode::Creative
-                                {
+                                );
+                                if !matches!(placement, Ok(Some(_))) {
+                                    self.undo_block_use(player, &world, data.block_position, face);
+                                } else if player.gamemode.load() != GameMode::Creative {
                                     stack.decrement(1);
                                 }
                             }

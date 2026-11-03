@@ -68,6 +68,7 @@ use crate::{
         player_command_send::PlayerCommandSendEvent,
         player_interact_entity_event::PlayerInteractEntityEvent,
         player_interact_event::{InteractAction, PlayerInteractEvent},
+        player_move::PlayerMoveEvent,
         player_toggle_flight_event::PlayerToggleFlightEvent,
     },
     server::{Server, seasonal_events},

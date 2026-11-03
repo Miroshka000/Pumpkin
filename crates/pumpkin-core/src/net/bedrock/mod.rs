@@ -138,6 +138,8 @@ pub struct BedrockClient {
     pub inventory_opened: AtomicBool,
     /// Separate from normal vitals caching so the first rejected use always gets corrected.
     last_food_rejection_tick: AtomicCell<Option<i32>>,
+    /// The block a plugin refused to let this client click, until the next press of the button.
+    denied_block: AtomicCell<Option<pumpkin_util::math::position::BlockPos>>,
     pub client_cache_supported: AtomicBool,
     pub blob_cache: std::sync::Mutex<HashMap<u64, Vec<u8>>>,
     pub streaming_packs: std::sync::Mutex<HashMap<String, BedrockStreamingPack>>,
@@ -178,6 +180,7 @@ impl BedrockClient {
             next_form_id: AtomicU32::new(0),
             inventory_opened: AtomicBool::new(false),
             last_food_rejection_tick: AtomicCell::new(None),
+            denied_block: AtomicCell::new(None),
             client_cache_supported: AtomicBool::new(false),
             blob_cache: std::sync::Mutex::new(HashMap::new()),
             streaming_packs: std::sync::Mutex::new(HashMap::new()),
