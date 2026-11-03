@@ -316,6 +316,21 @@ impl BedrockClient {
                             let count = count.min(source_stack.item_count);
                             if count > 0 {
                                 let dropped_stack = source_stack.copy_with_count(count);
+                                drop(screen_handler);
+                                let allowed = Self::allow_item_drop(player, &dropped_stack);
+                                screen_handler = current_screen_handler
+                                    .lock()
+                                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                                // The handler ran without the lock, so the slot has to be read again.
+                                source_stack = get_slot_stack(
+                                    &*screen_handler,
+                                    &source,
+                                    created_item.as_ref(),
+                                );
+                                if !allowed || source_stack.item_count < count {
+                                    result = 1;
+                                    break;
+                                }
                                 player.drop_item(dropped_stack);
 
                                 source_stack.decrement(count);

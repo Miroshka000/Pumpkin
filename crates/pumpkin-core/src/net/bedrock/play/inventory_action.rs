@@ -28,6 +28,77 @@ impl BedrockClient {
         player.send_health();
     }
 
+    /// Asks plugins whether the player may drop this stack.
+    ///
+    /// Handlers can look into the inventory, so no screen handler lock may be held around this call.
+    pub(super) fn allow_item_drop(player: &Arc<Player>, stack: &ItemStack) -> bool {
+        let Some(server) = player.world().server.upgrade() else {
+            return true;
+        };
+        let mut event =
+            crate::plugin::api::events::player::player_drop_item::PlayerDropItemEvent::new(
+                player.clone(),
+                stack.item.registry_key.to_string(),
+                stack.item_count,
+            );
+        server.plugin_manager.fire_blocking(&server, &mut event);
+        !event.cancelled
+    }
+
+    /// Checks the drops a legacy transaction is about to make. They go together or not at all.
+    fn allow_legacy_drops(&self, player: &Arc<Player>, packet: &SInventoryTransaction) -> bool {
+        let stacks: Vec<ItemStack> = {
+            let screen_handler = player
+                .player_screen_handler
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            packet
+                .legacy_set_item_slots
+                .iter()
+                .flat_map(|legacy_slot| {
+                    let window_id = match legacy_slot.container_id {
+                        28 | 29 => 0,
+                        6 | 120 => 120,
+                        34 | 119 => 119,
+                        other => other as i32,
+                    };
+                    legacy_slot.slots.iter().filter_map(move |&slot_id| {
+                        map_bedrock_slot_to_screen_handler(window_id, slot_id as u32)
+                    })
+                })
+                .map(|screen_slot| screen_handler.get_slot(screen_slot).get_cloned_stack())
+                .filter(|stack| !stack.is_empty())
+                .collect()
+        };
+        let allowed = stacks
+            .iter()
+            .all(|stack| Self::allow_item_drop(player, stack));
+        if !allowed {
+            self.send_inventory_content(player);
+        }
+        allowed
+    }
+
+    /// Checks the drops a normal transaction is about to make, before it changes anything:
+    /// a refused drop has to leave the inventory as it was.
+    fn allow_world_drops(&self, player: &Arc<Player>, packet: &SInventoryTransaction) -> bool {
+        use pumpkin_protocol::bedrock::server::inventory_transaction::InventoryActionSource;
+        let allowed = packet
+            .actions
+            .iter()
+            .filter(|action| {
+                InventoryActionSource::from(action.source_type) == InventoryActionSource::World
+            })
+            .filter(|action| descriptor_to_stack(&action.old_item).is_empty())
+            .map(|action| descriptor_to_stack(&action.new_item))
+            .filter(|stack| !stack.is_empty())
+            .all(|stack| Self::allow_item_drop(player, &stack));
+        if !allowed {
+            self.send_inventory_content(player);
+        }
+        allowed
+    }
+
     fn send_inventory_content(&self, player: &Player) {
         let slots = player
             .inventory()
@@ -69,7 +140,14 @@ impl BedrockClient {
         let mut updates = Vec::new();
         let result = 0u8;
 
-        if packet.actions.is_empty() && packet.legacy_request_id.0 != 0 {
+        if !self.allow_world_drops(player, &packet) {
+            return;
+        }
+
+        if packet.actions.is_empty()
+            && packet.legacy_request_id.0 != 0
+            && self.allow_legacy_drops(player, &packet)
+        {
             let mut player_screen_handler = player
                 .player_screen_handler
                 .lock()
