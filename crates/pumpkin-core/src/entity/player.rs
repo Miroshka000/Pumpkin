@@ -2725,13 +2725,15 @@ impl Player {
     }
 
     pub fn show_title(&self, text: &TextComponent, mode: &TitleMode) {
+        let locale = Locale::from_str(&self.config.load().locale).unwrap_or(Locale::EnUs);
+        let bedrock_text = text.0.to_bedrock_legacy(locale);
         match mode {
             TitleMode::Title => {
                 self.client.try_enqueue_packet_editioned(
                     &CTitleText::new(text),
                     &pumpkin_protocol::bedrock::client::set_title::CSetTitle::new(
                         pumpkin_protocol::bedrock::client::TitleType::Title,
-                        text.clone().get_text(),
+                        bedrock_text,
                         0,
                         0,
                         0,
@@ -2743,7 +2745,7 @@ impl Player {
                     &CSubtitle::new(text),
                     &pumpkin_protocol::bedrock::client::set_title::CSetTitle::new(
                         pumpkin_protocol::bedrock::client::TitleType::Subtitle,
-                        text.clone().get_text(),
+                        bedrock_text,
                         0,
                         0,
                         0,
@@ -2755,7 +2757,7 @@ impl Player {
                     &CActionBar::new(text),
                     &pumpkin_protocol::bedrock::client::set_title::CSetTitle::new(
                         pumpkin_protocol::bedrock::client::TitleType::Actionbar,
-                        text.clone().get_text(),
+                        bedrock_text,
                         0,
                         0,
                         0,
@@ -5737,6 +5739,11 @@ impl Player {
     }
 
     pub fn send_system_message_raw(&self, text: &TextComponent, overlay: bool) {
+        // Text packets have no overlay flag, so such a message would land in the Bedrock chat.
+        if overlay && matches!(self.client.as_ref(), ClientPlatform::Bedrock(_)) {
+            self.show_title(text, &TitleMode::ActionBar);
+            return;
+        }
         let je_packet = CSystemChatMessage::new(text, overlay);
         let locale = Locale::from_str(&self.config.load().locale).unwrap_or(Locale::EnUs);
         let be_packet = match &*text.0.content {
